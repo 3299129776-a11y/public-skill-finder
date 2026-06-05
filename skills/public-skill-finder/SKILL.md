@@ -18,35 +18,73 @@ Use this skill when the user:
 - Wants to search for tools, templates, or workflows
 - Mentions they wish they had help with a specific domain (design, testing, deployment, etc.)
 
-## Workflow
+## How to Help Users Find Skills
 
-1. Extract search keywords.
-   - The public skill registry search supports traditional keyword search. It does not understand natural language or semantic queries.
-   - Before running the find command, convert the user's intent into concise, space-separated keywords.
-   - Remove filler words (how, do, I, can, you, help, me, want, need, etc.).
-   - Keep domain-specific terms (react, go, kafka, docker, kubernetes, etc.).
-   - Keep action verbs that describe the task (deploy, test, monitor, review, lint, etc.).
-   - Use lowercase.
-   - Aim for 2-4 keywords for best results.
-2. Run the helper script from this skill directory:
+### Step 1: Extract Search Keywords (CRITICAL)
+
+The public skill registry search supports traditional keyword search. It does not understand natural language or semantic queries. Before running the find command, convert the user's intent into concise, space-separated keywords.
+
+Keyword extraction rules:
+
+1. Remove filler words (how, do, I, can, you, help, me, want, need, etc.)
+2. Keep domain-specific terms (react, go, kafka, docker, kubernetes, etc.)
+3. Keep action verbs that describe the task (deploy, test, monitor, review, lint, etc.)
+4. Use lowercase
+5. Aim for 2-4 keywords for best results
+
+### Step 2: Search for Skills
+
+Run the find command with the extracted keywords:
 
 ```bash
 python scripts/find_public_skills.py "resume generator" --extra-query "cv resume" --limit 6
 ```
 
-3. If results are weak, run alternate queries:
-   - Use synonyms: `resume`, `cv`, `career`, `job application`.
-   - Pair domain + action: `react testing`, `seo audit`, `pdf extraction`.
-   - Try narrower or broader terms.
-4. Verify candidates before recommending them.
-   - Read `references/search-and-evaluation.md` when judging quality or relevance.
-   - Prefer higher install counts, trusted maintainers, clear `SKILL.md` content, and direct task match.
-5. Present concise recommendations with:
-   - Skill package name
-   - Source link when available
-   - Why it fits
-   - Caveats such as API keys, paid services, auth requirements, or low adoption
-   - Install command
+Manual CLI equivalent:
+
+```bash
+npx -y skills@latest find resume generator --source external -y
+```
+
+If results are weak, run alternate queries:
+
+- Use synonyms: `resume`, `cv`, `career`, `job application`.
+- Pair domain + action: `react testing`, `seo audit`, `pdf extraction`.
+- Try narrower or broader terms.
+
+### Step 3: Interpret the Results
+
+The CLI output groups public registry results under headers such as `EXTERNAL SKILLS`. The helper script parses that output, ignores non-public sections if they appear, deduplicates package identifiers, and renders matches as `[Public]` candidates.
+
+### Step 4: Verify Quality Before Recommending
+
+Do not recommend a skill based solely on search results. Always verify:
+
+- Install/star count: Prefer skills with higher adoption. Be cautious with very low counts.
+- Source reputation: For public skills, official or well-known sources such as `vercel-labs`, `anthropic`, and `microsoft` are more trustworthy.
+- Relevance: Make sure the skill actually matches what the user needs, not just keyword overlap.
+
+Read `references/search-and-evaluation.md` when judging quality or relevance. For package inspection, open the `skills.sh` or public GitHub link when available.
+
+### Step 5: Present Options to the User
+
+When you find relevant skills, present them clearly with the source labeled:
+
+```markdown
+**[Public]** `owner/repo@skill-name`
+Source: https://skills.sh/owner/repo/skill-name
+Best for: [specific use case]
+Caveats: [none / needs API key / low adoption / verify docs]
+Install: `npx -y skills@latest add "owner/repo@skill-name" -g -y`
+```
+
+### Step 6: Offer to Install
+
+If the user wants to proceed, install the skill for them:
+
+```bash
+npx -y skills@latest add "owner/repo@skill-name" -g -y
+```
 
 ## Manual Fallback
 
@@ -54,21 +92,6 @@ If the helper script cannot run, call the skills CLI directly:
 
 ```bash
 npx -y skills@latest find resume generator --source external -y
-```
-
-For package inspection, open the `skills.sh` or public GitHub link when available. Do not recommend a skill based only on its name.
-
-## Output Template
-
-```markdown
-I found a few public skills that may fit:
-
-**[Public]** `owner/repo@skill-name`
-Source: https://skills.sh/owner/repo/skill-name
-Best for: [specific use case]
-Caveats: [none / needs API key / low adoption / verify docs]
-Install:
-`npx -y skills@latest add "owner/repo@skill-name" -g -y`
 ```
 
 When no relevant skills are found, say what searches were tried, suggest alternate keywords, and offer to help directly or create a new skill.
