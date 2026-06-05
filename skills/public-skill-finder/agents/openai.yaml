@@ -1,4 +1,4 @@
 interface:
   display_name: "Skill Finder"
-  short_description: "Find internal and external agent skills."
+  short_description: "Find public agent skills."
   default_prompt: "Use $public-skill-finder to find a skill for resume generation."

@@ -40,13 +40,13 @@ If the repository stores the skill in a subdirectory, confirm the installer supp
 
 Do not add:
 
-- Hardcoded private registry configuration
+- Private registry configuration
 - Organization-specific authentication flows
-- Internal package mirrors
+- Package mirrors
 - Telemetry scripts
 - Required API keys
 
-The helper script may support internal registry searches, but a public GitHub repository should leave registry/auth details to the user's local `skills@latest` configuration.
+The helper script should rely on the public `skills@latest` search path and the user's normal npm configuration.
 
 ## Release Checklist
 
@@ -55,5 +55,5 @@ Before publishing:
 1. Run `quick_validate.py` on the skill folder.
 2. Run the helper script with `--no-cli`.
 3. Run one live search if npm and network are available.
-4. Confirm no company-specific registry or credential is hardcoded.
+4. Confirm no organization-specific registry or credential is hardcoded.
 5. Confirm `SKILL.md` frontmatter contains only `name` and `description`.

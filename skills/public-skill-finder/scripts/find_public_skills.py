@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Find installable skills from internal and external skills registries."""
+"""Find installable skills from the public skills registry."""
 
 from __future__ import annotations
 
@@ -32,34 +32,27 @@ def parse_install_count(value: str) -> int:
     return int(float(value))
 
 
-def parse_cli_output(raw_output: str, query: str, source_hint: str = "both") -> list[dict[str, Any]]:
+def parse_cli_output(raw_output: str, query: str, source_hint: str = "external") -> list[dict[str, Any]]:
     """Extract skill candidates from `skills find` output."""
     text = strip_ansi(raw_output)
     candidates: list[dict[str, Any]] = []
     last_candidate: dict[str, Any] | None = None
     has_section_headers = any(line.strip().endswith("SKILLS") for line in text.splitlines())
-    current_source = source_hint if source_hint in {"internal", "external"} else "external"
-    in_result_section = not has_section_headers
+    in_public_section = not has_section_headers
 
     for raw_line in text.splitlines():
         line = raw_line.strip()
         if not line:
             continue
-        if line == "INTERNAL SKILLS":
-            current_source = "internal"
-            in_result_section = True
-            last_candidate = None
-            continue
         if line == "EXTERNAL SKILLS":
-            current_source = "external"
-            in_result_section = True
+            in_public_section = True
             last_candidate = None
             continue
         if line.endswith("SKILLS"):
-            in_result_section = False
+            in_public_section = False
             last_candidate = None
             continue
-        if not in_result_section:
+        if not in_public_section:
             continue
 
         url_match = URL_RE.search(line)
@@ -78,7 +71,7 @@ def parse_cli_output(raw_output: str, query: str, source_hint: str = "both") -> 
             "repository": package.split("@", 1)[0] if "@" in package else "",
             "installs": parse_install_count(install_match.group("count")),
             "url": "",
-            "source": current_source,
+            "source": "external",
             "query": query,
         }
         candidates.append(candidate)
@@ -100,7 +93,18 @@ def deduplicate(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return deduped
 
 
-def build_skills_find_command(query: str, source: str = "both") -> list[str]:
+def sort_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Sort results by install count, then package name."""
+    return sorted(
+        candidates,
+        key=lambda candidate: (
+            -int(candidate.get("installs", 0)),
+            str(candidate.get("package", "")).lower(),
+        ),
+    )
+
+
+def build_skills_find_command(query: str, source: str = "external") -> list[str]:
     """Build a platform-safe skills CLI command."""
     npx = shutil.which("npx") or shutil.which("npx.cmd")
     if npx is None:
@@ -111,15 +115,15 @@ def build_skills_find_command(query: str, source: str = "both") -> list[str]:
         "skills@latest",
         "find",
         *query.split(),
+        "--source",
+        "external",
+        "-y",
     ]
-    if source in {"internal", "external"}:
-        command.extend(["--source", source])
-    command.append("-y")
     return command
 
 
-def run_skills_find(query: str, timeout: int, source: str = "both") -> tuple[str, str | None]:
-    """Run `skills find` against selected registries."""
+def run_skills_find(query: str, timeout: int, source: str = "external") -> tuple[str, str | None]:
+    """Run `skills find` against the public registry."""
     try:
         command = build_skills_find_command(query, source=source)
     except FileNotFoundError:
@@ -189,7 +193,7 @@ def render_markdown(
         install_command = f'npx -y skills@latest add "{package}" -g -y'
         lines.extend(
             [
-                f"{index}. **[{candidate['source'].title()}]** `{package}`",
+                f"{index}. **[Public]** `{package}`",
                 f"   - Installs: {candidate['installs']}",
                 f"   - Matched query: `{candidate['query']}`",
                 f"   - Source: {candidate['url'] or 'No skills.sh URL found in CLI output'}",
@@ -201,7 +205,7 @@ def render_markdown(
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Search internal and external agent skill registries.",
+        description="Search public agent skill registries.",
     )
     parser.add_argument("queries", nargs="+", help="Primary search query or queries.")
     parser.add_argument(
@@ -211,12 +215,6 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Additional query to run. Can be provided multiple times.",
     )
     parser.add_argument("--limit", type=int, default=6, help="Maximum candidates to output.")
-    parser.add_argument(
-        "--source",
-        choices=["both", "internal", "external"],
-        default="both",
-        help="Registry source to search.",
-    )
     parser.add_argument(
         "--format",
         choices=["markdown", "json"],
@@ -247,13 +245,12 @@ def main(argv: list[str] | None = None) -> int:
         errors.append("CLI execution skipped because `--no-cli` was provided.")
     else:
         for query in queries:
-            output, error = run_skills_find(query, timeout=args.timeout, source=args.source)
+            output, error = run_skills_find(query, timeout=args.timeout)
             if error:
                 errors.append(error)
-            candidates.extend(parse_cli_output(output, query=query, source_hint=args.source))
+            candidates.extend(parse_cli_output(output, query=query))
 
-    candidates = deduplicate(candidates)
-    candidates.sort(key=lambda candidate: candidate["installs"], reverse=True)
+    candidates = sort_candidates(deduplicate(candidates))
 
     if args.format == "json":
         print(
