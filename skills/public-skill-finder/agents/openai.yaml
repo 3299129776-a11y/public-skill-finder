@@ -1,0 +1,4 @@
+interface:
+  display_name: "Public Skill Finder"
+  short_description: "Find public GitHub-hosted agent skills."
+  default_prompt: "Use $public-skill-finder to find public skills for resume generation."
